@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sequence สำหรับบริษัทรถร่วม -->
+        <record id="seq_vehicle_partner_company" model="ir.sequence">
+            <field name="name">Vehicle Partner Company Sequence</field>
+            <field name="code">vehicle.partner.company</field>
+            <field name="prefix">VPC-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+        <!-- Sequence สำหรับผู้ขับขี่ -->
+        <record id="seq_vehicle_driver" model="ir.sequence">
+            <field name="name">Vehicle Driver Sequence</field>
+            <field name="code">vehicle.driver</field>
+            <field name="prefix">DRV-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+        <!-- Sequence สำหรับการแจ้งซ่อม -->
+        <record id="seq_vehicle_maintenance_request" model="ir.sequence">
+            <field name="name">Vehicle Maintenance Request Sequence</field>
+            <field name="code">vehicle.maintenance.request</field>
+            <field name="prefix">MR-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+        <!-- Sequence สำหรับประวัติการซ่อม -->
+        <record id="seq_vehicle_maintenance_history" model="ir.sequence">
+            <field name="name">Vehicle Maintenance History Sequence</field>
+            <field name="code">vehicle.maintenance.history</field>
+            <field name="prefix">MH-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+        <!-- Sequence สำหรับการอนุมัติการแจ้งซ่อม -->
+        <record id="seq_maintenance_approval" model="ir.sequence">
+            <field name="name">Maintenance Approval Sequence</field>
+            <field name="code">maintenance.approval</field>
+            <field name="prefix">APR-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+    </data>
+</odoo>

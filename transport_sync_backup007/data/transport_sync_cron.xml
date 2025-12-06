@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- 🕐 Cron Job: ซิงค์ข้อมูลจาก Odoo 14 อัตโนมัติ -->
+        <record id="ir_cron_transport_sync" model="ir.cron">
+            <field name="name">Transport: Auto Sync from Odoo 14</field>
+            <field name="model_id" ref="model_transport_order"/>
+            <field name="state">code</field>
+            <field name="code">model.action_sync_from_odoo14()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="doall" eval="False"/>
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Vehicle Map View Template with Leaflet (Free, No API Key Required) -->
+    <template id="vehicle_map_view" name="Vehicle Map View">
+        <t t-call="web.layout">
+            <div class="container-fluid" style="padding: 0; height: 100vh;">
+                <div id="map-container" style="height: 100%;">
+                    <!-- Vehicle Info Panel -->
+                    <div id="vehicle-info-panel" style="position: absolute; top: 20px; left: 20px; 
+                         background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                         z-index: 1000; max-width: 350px;">
+                        <h4 style="margin: 0 0 10px 0; color: #333;">
+                            <i class="fa fa-truck"></i>
+                            <span id="vehicle-name"><t t-esc="vehicle.device_name or vehicle.lpn"/></span>
+                        </h4>
+                        <div style="font-size: 13px; line-height: 1.6;">
+                            <div><strong>เลขทะเบียน:</strong> <span id="vehicle-lpn"><t t-esc="vehicle.lpn"/></span></div>
+                            <div><strong>IMEI:</strong> <span id="vehicle-imei"><t t-esc="vehicle.imei"/></span></div>
+                            <div><strong>กลุ่มรถ:</strong> <span id="vehicle-fleet"><t t-esc="vehicle.fleet_name or '-'"/></span></div>
+                            <div><strong>สถานะ:</strong> <span id="vehicle-status" class="badge badge-info"><t t-esc="vehicle.status_text"/></span></div>
+                            <div><strong>ความเร็ว:</strong> <span id="vehicle-speed"><t t-esc="'%.1f' % vehicle.speed"/></span> กม./ชม.</div>
+                            <div><strong>เลขไมล์:</strong> <span id="vehicle-mileage"><t t-esc="'%.2f' % vehicle.mileage_km"/></span> กม.</div>
+                            <div><strong>อัปเดตล่าสุด:</strong> <span id="vehicle-updated"><t t-esc="vehicle.utc_timestamp.strftime('%d/%m/%Y %H:%M:%S') if vehicle.utc_timestamp else '-'"/></span></div>
+                            <hr style="margin: 10px 0;"/>
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <button id="btn-refresh" class="btn btn-sm btn-primary" onclick="refreshVehicleData()" style="flex: 1; min-width: 120px;">
+                                    <i class="fa fa-refresh"></i> รีเฟรชเดี๋ยวนี้
+                                </button>
+                                <div style="flex: 1; min-width: 150px;">
+                                    <small id="auto-refresh-status" style="color: #666; display: block;">
+                                        <i class="fa fa-clock-o"></i> รีเฟรชใน <span id="countdown">60</span> วินาที
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Leaflet Map -->
+                    <div id="map" style="height: 100%; width: 100%;"></div>
+                </div>
+                
+                <!-- Leaflet CSS -->
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+                      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+                      crossorigin=""/>
+                
+                <!-- Leaflet JS -->
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+                        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+                        crossorigin=""></script>
+                
+                <script type="text/javascript">
+                    let map;
+                    let marker;
+                    let countdownInterval;
+                    let refreshInterval;
+                    let secondsUntilRefresh = 60; // 60 seconds = 1 minute
+                    const vehicleId = <t t-esc="vehicle.id"/>;
+                    
+                    // Initialize map with Leaflet
+                    function initMap() {
+                        const lat = <t t-esc="vehicle.latitude"/>;
+                        const lng = <t t-esc="vehicle.longitude"/>;
+                        const engineStatus = '<t t-esc="vehicle.engine_status"/>';
+                        const course = <t t-esc="vehicle.course or 0"/>;
+                        
+                        // Create map
+                        map = L.map('map').setView([lat, lng], 15);
+                        
+                        // Add OpenStreetMap tiles
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&amp;copy; &lt;a href="https://www.openstreetmap.org/copyright"&gt;OpenStreetMap&lt;/a&gt; contributors',
+                            maxZoom: 19
+                        }).addTo(map);
+                        
+                        // Create custom arrow icon (pointing UP/NORTH by default)
+                        const markerColor = engineStatus === '1' ? '#28a745' : '#dc3545';  // Green or Red
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `&lt;div style="transform: rotate(${course}deg); transform-origin: center center;"&gt;
+                                      &lt;svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"&gt;
+                                        &lt;!-- Shadow Circle --&gt;
+                                        &lt;circle cx="20" cy="21" r="11" fill="rgba(0,0,0,0.2)"/&gt;
+                                        
+                                        &lt;!-- Background Circle --&gt;
+                                        &lt;circle cx="20" cy="20" r="11" fill="white" stroke="#ddd" stroke-width="1"/&gt;
+                                        
+                                        &lt;!-- Inner Circle --&gt;
+                                        &lt;circle cx="20" cy="20" r="9" fill="${markerColor}" stroke="white" stroke-width="2"/&gt;
+                                        
+                                        &lt;!-- Arrow --&gt;
+                                        &lt;path d="M 20 8 L 26 18 L 23 18 L 23 26 L 17 26 L 17 18 L 14 18 Z" 
+                                              fill="white" stroke="white" stroke-width="0.5" stroke-linejoin="round"/&gt;
+                                      &lt;/svg&gt;
+                                   &lt;/div&gt;`,
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        });
+                        
+                        // Add marker
+                        marker = L.marker([lat, lng], {
+                            icon: customIcon,
+                            title: '<t t-esc="vehicle.device_name or vehicle.lpn"/>'
+                        }).addTo(map);
+                        
+                        // Add popup
+                        const popupContent = getPopupContent();
+                        marker.bindPopup(popupContent);
+                    }
+                    
+                    function getPopupContent() {
+                        const deviceName = document.getElementById('vehicle-name').textContent;
+                        const lpn = document.getElementById('vehicle-lpn').textContent;
+                        const status = document.getElementById('vehicle-status').textContent;
+                        const speed = document.getElementById('vehicle-speed').textContent;
+                        
+                        return `
+                            &lt;div style="padding: 10px; min-width: 200px;"&gt;
+                                &lt;h5 style="margin: 0 0 10px 0;"&gt;${deviceName}&lt;/h5&gt;
+                                &lt;p style="margin: 5px 0;"&gt;&lt;strong&gt;ทะเบียน:&lt;/strong&gt; ${lpn}&lt;/p&gt;
+                                &lt;p style="margin: 5px 0;"&gt;&lt;strong&gt;สถานะ:&lt;/strong&gt; ${status}&lt;/p&gt;
+                                &lt;p style="margin: 5px 0;"&gt;&lt;strong&gt;ความเร็ว:&lt;/strong&gt; ${speed} กม./ชม.&lt;/p&gt;
+                            &lt;/div&gt;
+                        `;
+                    }
+                    
+                    // Refresh vehicle data
+                    async function refreshVehicleData() {
+                        const btnRefresh = document.getElementById('btn-refresh');
+                        btnRefresh.disabled = true;
+                        btnRefresh.innerHTML = '&lt;i class="fa fa-spinner fa-spin"&gt;&lt;/i&gt; กำลังโหลด...';
+                        
+                        try {
+                            const response = await fetch('/vehicle_tracking/get_vehicle/' + vehicleId, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    method: 'call',
+                                    params: {}
+                                })
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.result &amp;&amp; data.result.success) {
+                                updateVehicleDisplay(data.result.data);
+                                resetCountdown();
+                            } else {
+                                console.error('Failed to fetch vehicle data');
+                            }
+                        } catch (error) {
+                            console.error('Error refreshing data:', error);
+                        } finally {
+                            btnRefresh.disabled = false;
+                            btnRefresh.innerHTML = '&lt;i class="fa fa-refresh"&gt;&lt;/i&gt; รีเฟรชเดี๋ยวนี้';
+                        }
+                    }
+                    
+                    // Update vehicle display with new data
+                    function updateVehicleDisplay(vehicleData) {
+                        // Update info panel
+                        document.getElementById('vehicle-name').textContent = vehicleData.device_name || vehicleData.lpn;
+                        document.getElementById('vehicle-lpn').textContent = vehicleData.lpn || '-';
+                        document.getElementById('vehicle-imei').textContent = vehicleData.imei || '-';
+                        document.getElementById('vehicle-fleet').textContent = vehicleData.fleet_name || '-';
+                        document.getElementById('vehicle-status').textContent = vehicleData.status || '-';
+                        document.getElementById('vehicle-speed').textContent = vehicleData.speed.toFixed(1);
+                        document.getElementById('vehicle-mileage').textContent = vehicleData.mileage_km.toFixed(2);
+                        
+                        if (vehicleData.utc_timestamp) {
+                            const date = new Date(vehicleData.utc_timestamp);
+                            document.getElementById('vehicle-updated').textContent = 
+                                date.toLocaleString('th-TH', { 
+                                    year: 'numeric', 
+                                    month: '2-digit', 
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                });
+                        }
+                        
+                        // Update map and marker position
+                        const newPosition = [vehicleData.latitude, vehicleData.longitude];
+                        marker.setLatLng(newPosition);
+                        map.panTo(newPosition);
+                        
+                        // Update marker icon color and rotation based on engine status and course
+                        const markerColor = vehicleData.engine_status === '1' ? '#28a745' : '#dc3545';  // Green or Red
+                        const course = vehicleData.course || 0;
+                        
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `&lt;div style="transform: rotate(${course}deg); transform-origin: center center;"&gt;
+                                      &lt;svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"&gt;
+                                        &lt;!-- Shadow Circle --&gt;
+                                        &lt;circle cx="20" cy="21" r="11" fill="rgba(0,0,0,0.2)"/&gt;
+                                        
+                                        &lt;!-- Background Circle --&gt;
+                                        &lt;circle cx="20" cy="20" r="11" fill="white" stroke="#ddd" stroke-width="1"/&gt;
+                                        
+                                        &lt;!-- Inner Circle --&gt;
+                                        &lt;circle cx="20" cy="20" r="9" fill="${markerColor}" stroke="white" stroke-width="2"/&gt;
+                                        
+                                        &lt;!-- Arrow --&gt;
+                                        &lt;path d="M 20 8 L 26 18 L 23 18 L 23 26 L 17 26 L 17 18 L 14 18 Z" 
+                                              fill="white" stroke="white" stroke-width="0.5" stroke-linejoin="round"/&gt;
+                                      &lt;/svg&gt;
+                                   &lt;/div&gt;`,
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        });
+                        
+                        marker.setIcon(customIcon);
+                        
+                        // Update popup content
+                        marker.setPopupContent(getPopupContent());
+                        
+                        // Update status badge color
+                        const statusBadge = document.getElementById('vehicle-status');
+                        statusBadge.className = 'badge';
+                        if (vehicleData.status.includes('เคลื่อนที่')) {
+                            statusBadge.className += ' badge-success';
+                        } else if (vehicleData.status.includes('ติด')) {
+                            statusBadge.className += ' badge-warning';
+                        } else {
+                            statusBadge.className += ' badge-secondary';
+                        }
+                    }
+                    
+                    // Countdown timer
+                    function startCountdown() {
+                        countdownInterval = setInterval(function() {
+                            secondsUntilRefresh--;
+                            document.getElementById('countdown').textContent = secondsUntilRefresh;
+                            
+                            if (secondsUntilRefresh &lt;= 0) {
+                                secondsUntilRefresh = 60;
+                            }
+                        }, 1000);
+                    }
+                    
+                    // Reset countdown
+                    function resetCountdown() {
+                        secondsUntilRefresh = 60;
+                        document.getElementById('countdown').textContent = secondsUntilRefresh;
+                    }
+                    
+                    // Auto-refresh every 60 seconds (1 minute)
+                    function startAutoRefresh() {
+                        refreshInterval = setInterval(function() {
+                            refreshVehicleData();
+                        }, 60000); // 60000ms = 60 seconds = 1 minute
+                    }
+                    
+                    // Initialize on page load
+                    window.onload = function() {
+                        initMap();
+                        startCountdown();
+                        startAutoRefresh();
+                    };
+                    
+                    // Cleanup on page unload
+                    window.onbeforeunload = function() {
+                        if (countdownInterval) clearInterval(countdownInterval);
+                        if (refreshInterval) clearInterval(refreshInterval);
+                    };
+                </script>
+                
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        overflow: hidden;
+                    }
+                    .badge {
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        display: inline-block;
+                    }
+                    .badge-success { background-color: #28a745; color: white; }
+                    .badge-warning { background-color: #ffc107; color: #333; }
+                    .badge-secondary { background-color: #6c757d; color: white; }
+                    .badge-info { background-color: #17a2b8; color: white; }
+                    
+                    .custom-marker {
+                        background: transparent;
+                        border: none;
+                    }
+                    
+                    /* Responsive design for mobile */
+                    @media (max-width: 768px) {
+                        #vehicle-info-panel {
+                            max-width: 280px !important;
+                            font-size: 12px !important;
+                        }
+                        #vehicle-info-panel h4 {
+                            font-size: 16px !important;
+                        }
+                    }
+                </style>
+            </div>
+        </t>
+    </template>
+    
+</odoo>

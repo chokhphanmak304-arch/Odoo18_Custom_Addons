@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_delivery_history_tree" model="ir.ui.view">
+        <field name="name">delivery.history.list</field>
+        <field name="model">delivery.history</field>
+        <field name="arch" type="xml">
+            <list string="ประวัติการจัดส่ง" default_order="completion_date desc" 
+                  decoration-success="state == 'completed'" 
+                  decoration-muted="state == 'cancelled'">
+                <field name="name" string="เลขที่จอง"/>
+                <field name="completion_date" string="วันที่เสร็จสิ้น"/>
+                <field name="partner_name" string="ลูกค้า"/>
+                <field name="driver_name" string="คนขับ"/>
+                <field name="vehicle_name" string="รถ"/>
+                <field name="pickup_location" string="ต้นทาง"/>
+                <field name="destination" string="ปลายทาง"/>
+                <field name="distance_km" string="ระยะทาง (กม.)"/>
+                <field name="duration_hours" string="ระยะเวลา (ชม.)"/>
+                <field name="shipping_cost" string="ค่าขนส่ง" widget="monetary"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" string="สถานะ" widget="badge" 
+                       decoration-success="state == 'completed'" 
+                       decoration-warning="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_delivery_history_form" model="ir.ui.view">
+        <field name="name">delivery.history.form</field>
+        <field name="model">delivery.history</field>
+        <field name="arch" type="xml">
+            <form string="ประวัติการจัดส่ง">
+                <header>
+                    <button name="action_view_booking" string="ดูการจองต้นฉบับ" type="object" 
+                            class="btn-primary" invisible="not booking_id"/>
+                    <button name="action_view_map" string="🗺️ ดูแผนที่" type="object" 
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="ข้อมูลทั่วไป">
+                            <field name="completion_date"/>
+                            <field name="partner_id"/>
+                            <field name="partner_name" invisible="1"/>
+                        </group>
+                        <group string="พนักงานและรถ">
+                            <field name="driver_id"/>
+                            <field name="driver_name" invisible="1"/>
+                            <field name="vehicle_id"/>
+                            <field name="vehicle_name" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="เส้นทาง">
+                            <field name="pickup_location"/>
+                            <field name="destination"/>
+                            <field name="distance_km"/>
+                            <field name="shipping_cost" widget="monetary"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="เวลา">
+                            <field name="planned_start_date"/>
+                            <field name="actual_pickup_time"/>
+                            <field name="actual_delivery_time"/>
+                            <field name="duration_hours"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="📸 หลักฐาน">
+                            <group>
+                                <group string="รูปถ่ายสินค้า">
+                                    <field name="pickup_photo" widget="image" class="oe_avatar" 
+                                           options="{'size': [300, 300]}"/>
+                                </group>
+                                <group string="หลักฐานการส่ง">
+                                    <field name="delivery_photo" widget="image" class="oe_avatar" 
+                                           options="{'size': [300, 300]}"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="ผู้รับ">
+                                    <field name="receiver_name"/>
+                                    <field name="receiver_signature" widget="image" class="oe_avatar" 
+                                           options="{'size': [200, 100]}"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="📍 พิกัด GPS">
+                            <group>
+                                <group string="จุดรับสินค้า">
+                                    <field name="pickup_latitude"/>
+                                    <field name="pickup_longitude"/>
+                                </group>
+                                <group string="จุดส่ง">
+                                    <field name="destination_latitude"/>
+                                    <field name="destination_longitude"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="📝 หมายเหตุ">
+                            <field name="note" placeholder="หมายเหตุเพิ่มเติม..."/>
+                            <separator string="บันทึกการติดตาม"/>
+                            <field name="tracking_notes" placeholder="บันทึกระหว่างการจัดส่ง..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_delivery_history_search" model="ir.ui.view">
+        <field name="name">delivery.history.search</field>
+        <field name="model">delivery.history</field>
+        <field name="arch" type="xml">
+            <search string="ค้นหาประวัติการจัดส่ง">
+                <field name="name" string="เลขที่จอง"/>
+                <field name="partner_name" string="ลูกค้า"/>
+                <field name="driver_name" string="คนขับ"/>
+                <field name="vehicle_name" string="รถ"/>
+                <field name="receiver_name" string="ผู้รับ"/>
+                
+                <filter name="completed" string="✅ เสร็จสิ้น" 
+                        domain="[('state', '=', 'completed')]"/>
+                <filter name="cancelled" string="❌ ยกเลิก" 
+                        domain="[('state', '=', 'cancelled')]"/>
+                
+                <separator/>
+                <filter name="today" string="วันนี้" 
+                        domain="[('completion_date', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0))),
+                                ('completion_date', '&lt;=', datetime.datetime.combine(context_today(), datetime.time(23,59,59)))]"/>
+                <filter name="this_week" string="สัปดาห์นี้" 
+                        domain="[('completion_date', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d')),
+                                ('completion_date', '&lt;=', (context_today() + datetime.timedelta(days=6-context_today().weekday())).strftime('%Y-%m-%d'))]"/>
+                <filter name="this_month" string="เดือนนี้" 
+                        domain="[('completion_date', '&gt;=', (context_today() - datetime.timedelta(days=context_today().day-1)).strftime('%Y-%m-%d'))]"/>
+                
+                <group expand="0" string="Group By">
+                    <filter name="group_by_driver" string="คนขับ" context="{'group_by': 'driver_id'}"/>
+                    <filter name="group_by_vehicle" string="รถ" context="{'group_by': 'vehicle_id'}"/>
+                    <filter name="group_by_partner" string="ลูกค้า" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_date" string="วันที่" context="{'group_by': 'completion_date:month'}"/>
+                    <filter name="group_by_state" string="สถานะ" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Kanban View -->
+    <record id="view_delivery_history_kanban" model="ir.ui.view">
+        <field name="name">delivery.history.kanban</field>
+        <field name="model">delivery.history</field>
+        <field name="arch" type="xml">
+            <kanban default_order="completion_date desc">
+                <field name="name"/>
+                <field name="partner_name"/>
+                <field name="driver_name"/>
+                <field name="vehicle_name"/>
+                <field name="completion_date"/>
+                <field name="shipping_cost"/>
+                <field name="state"/>
+                <field name="pickup_photo"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
+                            <div class="o_kanban_image">
+                                <img t-att-src="kanban_image('delivery.history', 'pickup_photo', record.id.raw_value)" 
+                                     alt="ภาพ" class="o_kanban_image_inner_pic"/>
+                            </div>
+                            <div class="oe_kanban_details">
+                                <strong class="o_kanban_record_title">
+                                    <field name="name"/>
+                                </strong>
+                                <div class="o_kanban_record_subtitle">
+                                    <field name="partner_name"/>
+                                </div>
+                                <div class="o_kanban_record_subtitle">
+                                    👤 <field name="driver_name"/> | 🚚 <field name="vehicle_name"/>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    📅 <field name="completion_date"/>
+                                </div>
+                                <div class="o_kanban_record_bottom">
+                                    <div class="oe_kanban_bottom_left">
+                                        <field name="shipping_cost" widget="monetary"/>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <field name="state" widget="label" 
+                                               options="{'classes': {'completed': 'success', 'cancelled': 'warning'}}"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_delivery_history" model="ir.actions.act_window">
+        <field name="name">📜 ประวัติการจัดส่ง</field>
+        <field name="res_model">delivery.history</field>
+        <field name="view_mode">tree,form,kanban</field>
+        <field name="context">{'search_default_completed': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                ยังไม่มีประวัติการจัดส่ง
+            </p>
+            <p>
+                ประวัติการจัดส่งจะถูกสร้างอัตโนมัติเมื่อการจองเสร็จสิ้น
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item - DISABLED (ดูผ่าน Tab ใน Vehicle Booking แทน) -->
+    <!--
+    <menuitem id="menu_delivery_history"
+              name="📜 ประวัติการจัดส่ง"
+              parent="menu_vehicle_booking_root"
+              action="action_delivery_history"
+              sequence="40"/>
+    -->
+
+</odoo>
