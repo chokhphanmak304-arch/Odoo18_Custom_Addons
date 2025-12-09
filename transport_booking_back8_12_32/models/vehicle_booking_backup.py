@@ -32,7 +32,7 @@ class VehicleBooking(models.Model):
         string='คำสั่งขนส่ง',
         required=True,
         tracking=True,
-        domain=[('name', 'ilike', 'SO%')]  # ❌ ลบ domain ออกไป - ใช้ method แทน
+        domain=[('name', 'ilike', 'SO%')]# ❌ ลบ domain ออกไป - ใช้ method แทน
     )
 
     # ข้อมูลลูกค้า
@@ -118,10 +118,10 @@ class VehicleBooking(models.Model):
     vehicle_id = fields.Many2one('fleet.vehicle',
                                  string='🚚 รถที่จัดส่ง',
                                  tracking=True,
-                                 )
+                                 domain=[('vehicle_check_status', '=', 'available')])
     driver_id = fields.Many2one('vehicle.driver',
                                 string='👤 คนขับ',
-                                tracking=True, required=True)
+                                tracking=True)
 
     # ✅ ชื่อคนขับ (Computed Field)
     driver_name = fields.Char(
@@ -203,86 +203,6 @@ class VehicleBooking(models.Model):
     expense_ids = fields.One2many('vehicle.booking.expense', 'booking_id', string='ค่าใช้จ่ายเพิ่มเติม')
     total_expense = fields.Float('รวมค่าใช้จ่ายเพิ่มเติม', compute='_compute_total_expense', store=True, digits=(12, 2))
 
-    # ==================== จองพร้อมกัน ====================
-    is_concurrent_booking = fields.Boolean(
-        string='🔗 จองพร้อมกัน',
-        default=False,
-        tracking=True,
-        help='ติ๊กเพื่อใช้รถร่วมกับการจองอื่นที่กำลังดำเนินการอยู่'
-    )
-
-    concurrent_booking_id = fields.Many2one(
-        'vehicle.booking',
-        string='📋 เลือกเลขที่จองที่ต้องการใช้รถร่วม',
-        domain="[('state', 'not in', ['draft', 'cancelled']), ('id', '!=', id)]",
-        tracking=True,
-        help='เลือกการจองที่ต้องการใช้รถร่วมกัน'
-    )
-
-    # ==================== เพิ่ม Onchange Methods ====================
-
-    @api.onchange('is_concurrent_booking')
-    def _onchange_is_concurrent_booking(self):
-        """เมื่อติ๊ก/ไม่ติ๊ก จองพร้อมกัน"""
-        if not self.is_concurrent_booking:
-            # ถ้าไม่ติ๊ก → เคลียร์การเลือก และเคลียร์รถ
-            self.concurrent_booking_id = False
-            self.vehicle_id = False
-            self.driver_id = False
-
-        # คืน domain สำหรับ vehicle_id
-        if self.is_concurrent_booking:
-            # ถ้าติ๊ก → ไม่จำกัด domain (รอเลือกจาก concurrent_booking_id)
-            return {
-                'domain': {
-                    'vehicle_id': []  # ไม่มี domain
-                }
-            }
-        else:
-            # ถ้าไม่ติ๊ก → ใช้ domain เดิม (เฉพาะรถว่าง)
-            return {
-                'domain': {
-                    'vehicle_id': [('vehicle_check_status', '=', 'available')]
-                }
-            }
-
-    @api.onchange('concurrent_booking_id')
-    def _onchange_concurrent_booking(self):
-        """เมื่อเลือกเลขที่จองที่ต้องการใช้รถร่วม"""
-        if self.is_concurrent_booking and self.concurrent_booking_id:
-            # ดึงรถจากการจองที่เลือก
-            if self.concurrent_booking_id.vehicle_id:
-                self.vehicle_id = self.concurrent_booking_id.vehicle_id.id
-                _logger.info(
-                    f"🔗 [Concurrent Booking] Copied vehicle {self.concurrent_booking_id.vehicle_id.license_plate} "
-                    f"from booking {self.concurrent_booking_id.name}"
-                )
-
-            # ดึงคนขับด้วย
-            if self.concurrent_booking_id.driver_id:
-                self.driver_id = self.concurrent_booking_id.driver_id.id
-                _logger.info(
-                    f"🔗 [Concurrent Booking] Copied driver {self.concurrent_booking_id.driver_id.name} "
-                    f"from booking {self.concurrent_booking_id.name}"
-                )
-
-    @api.constrains('is_concurrent_booking', 'concurrent_booking_id', 'note')
-    def _check_concurrent_booking_note(self):
-        """บังคับกรอกหมายเหตุเมื่อจองพร้อมกัน"""
-        for record in self:
-            if record.is_concurrent_booking and record.concurrent_booking_id:
-                # ตรวจสอบว่า note มีค่าหรือไม่ (HTML field อาจมี tag ว่างๆ)
-                note_text = record.note or ''
-                # ลบ HTML tags ออกเพื่อเช็คว่ามีข้อความจริงหรือไม่
-                import re
-                clean_note = re.sub(r'<[^>]*>', '', note_text).strip()
-
-                if not clean_note:
-                    raise ValidationError(
-                        '❌ กรุณาระบุหมายเหตุเมื่อใช้งานจองพร้อมกัน!\n'
-                        'โปรดระบุเหตุผลที่ต้องใช้รถร่วมกับการจองอื่น'
-                    )
-
     @api.constrains('planned_start_date')
     def _check_planned_start_date(self):
         """Block การบันทึกถ้าเป็นวันในอดีต"""
@@ -363,6 +283,15 @@ class VehicleBooking(models.Model):
                         <p>บันทึกข้อมูลก่อนเพื่อดูแผนที่ติดตาม</p>
                     </div>
                 '''
+
+    @api.depends('delivery_employee_name')
+    def _delivery_employee_name(self):
+        """✅ คำนวณชื่อคนขับจาก driver_id"""
+        for record in self:
+            if record.driver_id:
+                record.driver_name = record.driver_id.name or f"ID: {record.driver_id.id}"
+            else:
+                record.driver_name = None
 
     @api.depends('driver_id')
     def _compute_driver_name(self):
@@ -644,33 +573,33 @@ class VehicleBooking(models.Model):
                     self.vehicle_id = vehicle.id
                     _logger.info("🚚 Vehicle found: %s", vehicle.license_plate)
 
-                    # 👤 ค้นหาคนขับอัตโนมัติจาก delivery_employee_name
-                    if self.transport_order_id.delivery_employee_name:
-                        employee_name = self.transport_order_id.delivery_employee_name.strip()
+            # 👤 ค้นหาคนขับอัตโนมัติจาก delivery_employee_name
+            if self.transport_order_id.delivery_employee_name:
+                employee_name = self.transport_order_id.delivery_employee_name.strip()
 
-                        # ค้นหาแบบ exact match ก่อน
-                        driver = self.env['vehicle.driver'].search([
-                            ('name', '=', employee_name)
-                        ], limit=1)
+                # ค้นหาแบบ exact match ก่อน
+                driver = self.env['vehicle.driver'].search([
+                    ('name', '=', employee_name)
+                ], limit=1)
 
-                        # ถ้าไม่เจอ ลองค้นหาแบบ ilike (ไม่สนใจตัวพิมพ์เล็ก/ใหญ่)
-                        if not driver:
-                            driver = self.env['vehicle.driver'].search([
-                                ('name', 'ilike', employee_name)
-                            ], limit=1)
+                # ถ้าไม่เจอ ลองค้นหาแบบ ilike (ไม่สนใจตัวพิมพ์เล็ก/ใหญ่)
+                if not driver:
+                    driver = self.env['vehicle.driver'].search([
+                        ('name', 'ilike', employee_name)
+                    ], limit=1)
 
-                        if driver:
-                            self.driver_id = driver.id
-                            _logger.info("👤 Driver found: %s (ID: %s)", driver.name, driver.id)
-                        else:
-                            self.driver_id = False
-                            _logger.warning("⚠️ Driver not found for name: %s", employee_name)
-                    else:
-                        self.driver_id = False
-                        _logger.info("ℹ️ No delivery_employee_name provided")
+                if driver:
+                    self.driver_id = driver.id
+                    _logger.info("👤 Driver found: %s (ID: %s)", driver.name, driver.id)
                 else:
                     self.driver_id = False
-                    _logger.info("⚠️ No transport order selected")
+                    _logger.warning("⚠️ Driver not found for name: %s", employee_name)
+            else:
+                self.driver_id = False
+                _logger.info("ℹ️ No delivery_employee_name provided")
+        else:
+            self.driver_id = False
+            _logger.info("⚠️ No transport order selected")
 
     def action_confirm(self):
         """ยืนยันการจอง - สร้างเลขรันเอกสารและเปลี่ยนสถานะรถเป็น 'ติดจอง' (reserved)"""
@@ -711,18 +640,10 @@ class VehicleBooking(models.Model):
             if record.vehicle_id:
                 # อัพเดทสถานะรถเป็น 'กำลังจัดส่ง'
                 record.vehicle_id.write({'vehicle_check_status': 'in_delivery'})
-
-            # เตรียมค่าที่จะอัพเดท
-            vals = {
-                'state': 'in_progress',
-                'tracking_status': 'in_transit'
-            }
-
-            # ✅ ถ้า planned_start_date_t เป็นค่าว่าง ให้อัพเดทเป็นเวลาปัจจุบัน
-            if not record.planned_start_date_t:
-                vals['planned_start_date_t'] = fields.Datetime.now()
-
-            record.write(vals)
+        self.write({
+            'state': 'in_progress',
+            'tracking_status': 'in_transit'  # อัพเดทสถานะติดตาม
+        })
 
     def start_job_with_photo(self, photo_base64):
         """เริ่มงานพร้อมอัพโหลดรูปถ่ายสินค้า (สำหรับ Mobile App)"""
@@ -810,30 +731,17 @@ class VehicleBooking(models.Model):
             # ✅ ใช้ delivery_timestamp จากแอป ถ้ามี ไม่ใช่ fields.Datetime.now()
             actual_delivery_time = delivery_timestamp if delivery_timestamp else fields.Datetime.now()
 
-            # record.write({
-            #     'state': 'done',
-            #     'tracking_status': 'delivered',  # อัพเดทสถานะติดตาม
-            #     'actual_delivery_time': actual_delivery_time,  # บันทึกเวลาส่งถึงจริง (จากแอป)
-            #     # ✅ ไม่อัพเดท planned_end_date_t - เก็บค่าจากแอปไว้
-            # })
-            # ✅ เตรียมค่าที่จะอัพเดท
-            vals = {
+            record.write({
                 'state': 'done',
-                'tracking_status': 'delivered',
-                'actual_delivery_time': actual_delivery_time,
-            }
-
-            # ✅ ถ้า planned_end_date_t เป็นค่าว่าง ให้อัพเดทเป็นเวลาปัจจุบัน
-            if not record.planned_end_date_t:
-                vals['planned_end_date_t'] = fields.Datetime.now()
-                _logger.info(f"✅ [action_done] planned_end_date_t was empty, set to: {vals['planned_end_date_t']}")
-
-            record.write(vals)
+                'tracking_status': 'delivered',  # อัพเดทสถานะติดตาม
+                'actual_delivery_time': actual_delivery_time,  # บันทึกเวลาส่งถึงจริง (จากแอป)
+                # ✅ ไม่อัพเดท planned_end_date_t - เก็บค่าจากแอปไว้
+            })
 
             # 📜 สร้างประวัติการจัดส่ง
             try:
                 _logger.info(f"📜 Creating delivery history for booking: {record.name}")
-                history = self.env['delivery.history'].create_from_booking(record, source='odoo')  # ✅ เพิ่ม source='odoo'
+                history = self.env['delivery.history'].create_from_booking(record)
                 if history:
                     _logger.info(f"✅ Delivery history created: {history.id}")
                 else:
@@ -853,7 +761,7 @@ class VehicleBooking(models.Model):
             if record.actual_pickup_time or record.pickup_photo:
                 try:
                     _logger.info(f"📜 Creating cancelled delivery history for booking: {record.name}")
-                    history = self.env['delivery.history'].create_from_booking(record, source='odoo')  # ✅ เพิ่ม source='odoo'
+                    history = self.env['delivery.history'].create_from_booking(record)
                     if history:
                         _logger.info(f"✅ Cancelled delivery history created: {history.id}")
                 except Exception as e:

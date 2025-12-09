@@ -833,7 +833,7 @@ class VehicleBooking(models.Model):
             # 📜 สร้างประวัติการจัดส่ง
             try:
                 _logger.info(f"📜 Creating delivery history for booking: {record.name}")
-                history = self.env['delivery.history'].create_from_booking(record, source='odoo')  # ✅ เพิ่ม source='odoo'
+                history = self.env['delivery.history'].create_from_booking(record)
                 if history:
                     _logger.info(f"✅ Delivery history created: {history.id}")
                 else:
@@ -853,7 +853,7 @@ class VehicleBooking(models.Model):
             if record.actual_pickup_time or record.pickup_photo:
                 try:
                     _logger.info(f"📜 Creating cancelled delivery history for booking: {record.name}")
-                    history = self.env['delivery.history'].create_from_booking(record, source='odoo')  # ✅ เพิ่ม source='odoo'
+                    history = self.env['delivery.history'].create_from_booking(record)
                     if history:
                         _logger.info(f"✅ Cancelled delivery history created: {history.id}")
                 except Exception as e:

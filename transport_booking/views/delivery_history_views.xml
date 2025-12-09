@@ -144,7 +144,7 @@
                 <field name="driver_name" string="คนขับ"/>
                 <field name="vehicle_name" string="รถ"/>
                 <field name="receiver_name" string="ผู้รับ"/>
-                
+                <field name="source" widget="statusbar"/>
                 <filter name="completed" string="✅ เสร็จสิ้น" 
                         domain="[('state', '=', 'completed')]"/>
                 <filter name="cancelled" string="❌ ยกเลิก" 
@@ -185,6 +185,7 @@
                 <field name="shipping_cost"/>
                 <field name="state"/>
                 <field name="pickup_photo"/>
+                <field name="source" widget="statusbar"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
