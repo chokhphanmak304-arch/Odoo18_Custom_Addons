@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="crm_lead_kanban_inherit_customer_status" model="ir.ui.view">
+        <field name="name">crm.lead.kanban.customer.status</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_case_kanban_view_leads"/>
+        <field name="arch" type="xml">
+
+            <!-- โหลดฟิลด์ customer_status ใน kanban -->
+            <xpath expr="//kanban/field[@name='team_id']" position="after">
+                <field name="customer_status"/>
+            </xpath>
+
+            <!-- แทรกหลัง tag_ids ใน templates/card -->
+            <xpath expr="//templates//t[@t-name='card']//field[@name='tag_ids']" position="after">
+                <div t-if="record.customer_status.raw_value == 'old'"
+                     class="mt-2 p-1 rounded text-center fw-bold"
+                     style="background-color: #ffc107; color: black;">
+                    ประเภทลูกค้า: ลูกค้าเก่า
+                </div>
+                <div t-if="record.customer_status.raw_value == 'new'"
+                     class="mt-2 p-1 rounded text-center fw-bold"
+                     style="background-color: #28a745; color: white;">
+                    ประเภทลูกค้า: ลูกค้าใหม่
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

@@ -197,6 +197,46 @@ class VehicleBooking(models.Model):
     # สำหรับ Smart Button
     tracking_count = fields.Integer('จำนวน Tracking', compute='_compute_tracking_count')
 
+    # ==================== แหล่งที่มาการจัดส่ง ====================
+    source = fields.Selection([
+        ('app', '📱 App'),
+        ('odoo', '🖥️ Odoo'),
+    ], string='แหล่งที่มา', default='odoo', tracking=True,
+       help='ระบุว่าข้อมูลการจัดส่งมาจาก App หรือ Odoo')
+
+    # ==================== Delivery History Relation ====================
+    delivery_history_ids = fields.One2many(
+        'delivery.history', 'booking_id',
+        string='ประวัติการจัดส่ง'
+    )
+    
+    # ✅ Computed field สำหรับเช็คว่ามี source = 'app' หรือไม่
+    has_app_delivery = fields.Boolean(
+        string='มีข้อมูลจาก App',
+        compute='_compute_has_app_delivery',
+        store=True,
+        help='เช็คว่ามีประวัติการจัดส่งจาก App หรือไม่'
+    )
+    
+    delivery_source = fields.Char(
+        string='แหล่งที่มาการจัดส่ง',
+        compute='_compute_has_app_delivery',
+        store=True,
+    )
+
+    @api.depends('delivery_history_ids', 'delivery_history_ids.source')
+    def _compute_has_app_delivery(self):
+        """คำนวณว่ามีประวัติจาก App หรือไม่"""
+        for record in self:
+            app_histories = record.delivery_history_ids.filtered(lambda h: h.source == 'app')
+            record.has_app_delivery = bool(app_histories)
+            if app_histories:
+                record.delivery_source = 'app'
+            elif record.delivery_history_ids:
+                record.delivery_source = 'odoo'
+            else:
+                record.delivery_source = False
+
     # สำหรับแสดงแผนที่ tracking
     tracking_map_html = fields.Html('Tracking Map', compute='_compute_tracking_map_html', sanitize=False)
 
@@ -472,6 +512,13 @@ class VehicleBooking(models.Model):
 
     def write(self, vals):
         """อัพเดทเอกสาร - auto-geocode ถ้ามีการเปลี่ยนแปลง address"""
+        
+        # ✅ Auto-detect source = 'app' ถ้ามีข้อมูลจากแอป
+        app_fields = ['receiver_name', 'actual_pickup_time', 'actual_delivery_time', 'delivery_timestamp']
+        if any(vals.get(field) for field in app_fields):
+            vals['source'] = 'app'
+            _logger.info(f"📱 [WRITE] Detected app data, setting source='app'")
+        
         # 🌍 Auto-geocode ถ้ามี address ใหม่
         if vals.get('pickup_location'):
             # Force geocode ถ้า:

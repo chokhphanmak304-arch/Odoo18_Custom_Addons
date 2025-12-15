@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Form View - เพิ่มฟิลด์ใหม่ -->
+    <record id="view_crm_lead_form_inherit_status" model="ir.ui.view">
+        <field name="name">crm.lead.form.inherit.customer.status</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- ===== ปุ่มใน header ===== -->
+            <xpath expr="//header" position="inside">
+                <button name="action_check_overdue_credit"
+                        string="เช็คเครดิตค้างชำระ"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-credit-card"
+                        invisible="not partner_id"/>
+            </xpath>
+
+            <xpath expr="//sheet/group" position="inside">
+                <group string="เลือกประเภทลูกค้า 🎯">
+                    <field name="customer_status"/>
+                </group>
+                <group string="ผู้รับผิดชอบและแหล่งที่มา 🧭">
+                    <field name="position_owner" required="1"/>
+                    <field name="source_user_id" readonly="1"/>
+                </group>
+                <group string="มูลค่่ายอดเช่า 💸">
+                    <field name="net_amount" widget="monetary"/>
+                </group>
+
+                <group string="ยอดสะสมของลูกค้า 📊" colspan="2">
+                    <field name="total_amount_customer"
+                           widget="monetary"
+                           options="{'currency_field': 'company_currency'}"/>
+                    <field name="partner_sale_count"
+                           string="จำนวนบิลขาย"/>
+                </group>
+            </xpath>
+
+            <!-- แทรก notebook สำหรับแสดงตารางรายละเอียด -->
+            <xpath expr="//sheet/group" position="after">
+                <notebook>
+                    <page string="รายละเอียดบิลขาย 📋">
+                        <field name="sale_order_details"
+                               nolabel="1"
+                               colspan="2"
+                               widget="html"/>
+                    </page>
+                </notebook>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- Search View - Inherit จาก Opportunities Filter -->
+    <record id="crm_lead_search_inherit_date_filter" model="ir.ui.view">
+        <field name="name">crm.lead.search.date.filter</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.view_crm_case_opportunities_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='creation_date']" position="after">
+                <separator/>
+                <filter string="เดือนนี้"
+                        name="this_month"
+                        domain="[]"
+                        context="{'filter_this_month': 1}"/>
+                <filter string="เดือนที่แล้ว"
+                        name="last_month"
+                        domain="[]"
+                        context="{'filter_last_month': 1}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Tree View - แสดงยอดสะสมในหน้า list view -->
+    <record id="view_crm_lead_tree_inherit_total_amount" model="ir.ui.view">
+        <field name="name">crm.lead.tree.inherit.total.amount</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_case_tree_view_oppor"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='expected_revenue']" position="after">
+                <field name="total_amount_customer"
+                       widget="monetary"
+                       optional="hide"
+                       sum="Total Customer Amount"/>
+                <field name="partner_sale_count"
+                       optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

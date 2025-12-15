@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+      <record id="date_cheque_done_view_form" model="ir.ui.view">
+        <field name="name">date.cheque.done.view.form</field>
+        <field name="model">date.cheque.done</field>
+        <field name="arch" type="xml">
+        <form string="Cheque Done">
+            <sheet>
+            <group>
+             <separator string="Date Receipt Cheque" colspan="4" />
+                <group>
+                    <field name="date_done" />
+                </group>
+            </group>
+                    <footer>
+                        <button string="Confirm" name="action_done_cheque" type="object" class="oe_highlight"/>
+                        <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                    </footer>
+            </sheet>
+        </form>
+        </field>
+    </record>
+    
+
+</odoo>

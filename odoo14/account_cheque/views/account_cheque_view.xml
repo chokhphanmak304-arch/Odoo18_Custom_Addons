@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="account_cheque_view_form" model="ir.ui.view">
+    <field name="name">account.cheque.view.form</field>
+    <field name="model">account.cheque</field>
+    <field name="arch" type="xml">
+      <form string="Cheque">
+        <header>
+          <button name="action_confirm" string="Confirm" type="object" 
+                  invisible="state != 'assigned'"/>
+          <button name="action_cancel" string="Cancel" type="object" 
+                  invisible="state not in ['done','draft','reject']"/>
+          <button name="action_assigned" string="Assigned" type="object" 
+                  invisible="state != 'draft'"/>
+          <button name="action_reject" string="Reject" type="object" 
+                  invisible="state not in ['draft','assigned']"/>
+          <button name="action_redraft" string="Reset Draft" type="object" 
+                  invisible="state != 'cancel'"/>
+          <field name="state" widget="statusbar" statusbar_visible="draft,cancel,assigned,reject,done,cancel"/>
+        </header>
+        <sheet>
+          <group>
+            <group string="Cheque Info">
+              <field name="name" readonly="state != 'draft'"/>
+              <field name="partner_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+              <field name="payee_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+              <field name="employee_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+              <field name="date_cheque" readonly="state != 'draft'"/>
+              <field name="date_receipt" readonly="state not in ['draft','assigned']"/>
+              <field name="date_done" readonly="state not in ['draft','assigned']"/>
+              <field name="payment_method_id" options="{'no_create': True}" readonly="state not in ['draft','assign']"/>
+              <field name="cheque_total" readonly="state != 'draft'"/>
+              <field name="format_type" readonly="state != 'draft'"/>
+              <field name="company_id"/>
+            </group>
+            <group string="Account info">
+              <field name="journal_id" options="{'no_create': True}" 
+                     domain="[('type', 'in', ('bank', 'cash'))]" required="True" 
+                     readonly="state != 'draft'"/>
+              <field name="bank_id" options="{'no_create': True}" required="True" 
+                     readonly="state != 'draft'"/>
+              <field name="bank_partner_id" options="{'no_create': True}" required="True" 
+                     readonly="state != 'draft'"/>
+              <field name="account_bank_id" options="{'no_create': True}" 
+                     readonly="state != 'draft'"/>
+              <field name="move_id" readonly="True" force_save="1"/>
+            </group>
+          </group>
+          <group>
+            <group string="Payment Info">
+              <field name="payment_id"/>
+              <field name="remark"/>
+              <field name="cheque_type" invisible="False"/>
+            </group>
+          </group>
+        </sheet>
+        <div class="oe_chatter">
+          <field name="message_follower_ids"/>
+          <field name="activity_ids"/>
+          <field name="message_ids"/>
+        </div>
+      </form>
+    </field>
+  </record>
+
+  <record id="account_cheque_view_tree" model="ir.ui.view">
+    <field name="name">account.cheque.view.list</field>
+    <field name="model">account.cheque</field>
+    <field name="arch" type="xml">
+      <list string="Cheque">
+        <header>
+          <button string="Change Date Receipt" name="action_cheque_done" type="object" class="btn-primary"/>
+        </header>
+        <field name="name"/>
+        <field name="date_cheque"/>
+        <field name="partner_id"/>
+        <field name="cheque_type"/>
+        <field name="account_bank_id"/>
+        <field name="bank_id"/>
+        <field name="cheque_total"/>
+        <field name="date_done"/>
+        <field name="remark"/>
+        <field name="state"/>
+      </list>
+    </field>
+  </record>
+
+  <record model="ir.ui.view" id="view_account_cheque_pivot">
+    <field name="name">account.cheque.pivot</field>
+    <field name="model">account.cheque</field>
+    <field name="arch" type="xml">
+      <pivot string="Account Cheque" sample="1">
+        <field name="date_cheque" type="row"/>
+        <field name="cheque_total" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <record id="action_account_cheque_receipt" model="ir.actions.act_window">
+    <field name="name">Cheque Receipt</field>
+    <field name="res_model">account.cheque</field>
+    <field name="view_mode">list,kanban,form,pivot,graph</field>
+    <field name="domain">[('cheque_type','=','inbound')]</field>
+    <field name="context">{'default_cheque_type': 'inbound'}</field>
+    <field name="view_id" ref="account_cheque_view_tree"/>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">
+                Create Account Cheque
+      </p>
+      <p>
+                Create Account Cheque to recheck payment from customer
+      </p>
+    </field>
+  </record>
+
+  <record id="action_account_cheque_payment" model="ir.actions.act_window">
+    <field name="name">Cheque Payment</field>
+    <field name="res_model">account.cheque</field>
+    <field name="view_mode">list,kanban,form,pivot,graph</field>
+    <field name="domain">[('cheque_type','=','outbound')]</field>
+    <field name="context">{'default_cheque_type': 'outbound'}</field>
+    <field name="view_id" ref="account_cheque_view_tree"/>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">
+                Create Account Cheque
+      </p>
+      <p>
+                Create Account Cheque to recheck payment from customer
+      </p>
+    </field>
+  </record>
+
+  <record id="view_partner_bank_form" model="ir.ui.view">
+    <field name="name">res.partner.bank.view.form</field>
+    <field name="model">res.partner.bank</field>
+    <field name="inherit_id" ref="base.view_partner_bank_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='partner_id']" position="after">
+        <field name="account_bank_id"/>
+      </xpath>
+    </field>
+  </record>
+
+  <menuitem id="account_cheque_menu" name="Cheque" action="action_account_cheque_receipt" 
+            parent="account.menu_finance_receivables" sequence="10"/>
+
+  <menuitem id="account_cheque_menu_bill" name="Cheque" action="action_account_cheque_payment" 
+            parent="account.menu_finance_payables" sequence="10"/>
+
+</odoo>

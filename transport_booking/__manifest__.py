@@ -1,6 +1,6 @@
 {
     'name': 'จองคิวรถขนส่ง',
-    'version': '18.0.2.5.0',  # เพิ่ม Migration สำหรับ fix delivery_history database
+    'version': '18.0.2.7.0',  # เพิ่ม source field (Selection) สำหรับกรอง Dashboard
     'category': 'Operations/Inventory',
     'summary': 'ระบบจองคิวรถขนส่ง พร้อมแสดงเส้นทางบน Google Maps และติดตามรถ Real-time',
     'depends': [

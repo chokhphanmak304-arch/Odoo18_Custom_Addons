@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Inherit the CRM Lead form view to display the new customer_from_channel field -->
+        <record id="crm_lead_form_view_customer_from_channel" model="ir.ui.view">
+            <field name="name">crm.lead.form.customer.from.channel</field>
+            <field name="model">crm.lead</field>
+            <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//group[@name='Misc']" position="inside">
+                    <field name="customer_from_channel"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

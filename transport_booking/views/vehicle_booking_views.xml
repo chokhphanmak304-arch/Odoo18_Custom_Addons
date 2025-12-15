@@ -147,6 +147,7 @@
            force_save="1"/>
 
     <field name="license_plate_name" readonly="1"/>
+        <field name="source" readonly="1"/>
 </group>
 </group>
 

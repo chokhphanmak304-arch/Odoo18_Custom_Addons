@@ -199,7 +199,9 @@ class TransportOrder(models.Model):
         }
 
     def _remove_duplicate_orders(self):
-        """ลบ records ที่มี name ซ้ำกัน (เก็บไว้เฉพาะ record ที่มี id น้อยที่สุด)"""
+        """ลบ records ที่มี name ซ้ำกัน (เก็บไว้เฉพาะ record ที่มี id น้อยที่สุด)
+           ✅ ข้าม record ที่มี vehicle_booking อ้างอิงอยู่
+        """
         self.env.cr.execute("""
             SELECT name, COUNT(*), array_agg(id ORDER BY id)
             FROM transport_order
@@ -210,19 +212,71 @@ class TransportOrder(models.Model):
         duplicates = self.env.cr.fetchall()
         
         total_deleted = 0
+        skipped_in_use = 0
+        
         for name, count, ids in duplicates:
             # เก็บ id แรก (น้อยที่สุด) ลบที่เหลือ
             ids_to_delete = ids[1:]  # ข้าม id แรก
             if ids_to_delete:
-                orders_to_delete = self.browse(ids_to_delete)
-                orders_to_delete.unlink()
-                total_deleted += len(ids_to_delete)
-                _logger.info(f"🗑️ ลบ {name} ที่ซ้ำ: {len(ids_to_delete)} รายการ (เก็บ ID {ids[0]})")
+                # ✅ เช็คว่ามี vehicle_booking อ้างอิงอยู่หรือไม่
+                self.env.cr.execute("""
+                    SELECT transport_order_id 
+                    FROM vehicle_booking 
+                    WHERE transport_order_id = ANY(%s)
+                """, (ids_to_delete,))
+                used_ids = [row[0] for row in self.env.cr.fetchall()]
+                
+                # ✅ กรองเอาเฉพาะ id ที่ไม่ถูกใช้งาน
+                safe_to_delete = [id for id in ids_to_delete if id not in used_ids]
+                skipped_in_use += len(used_ids)
+                
+                if safe_to_delete:
+                    orders_to_delete = self.browse(safe_to_delete)
+                    orders_to_delete.unlink()
+                    total_deleted += len(safe_to_delete)
+                    _logger.info(f"🗑️ ลบ {name} ที่ซ้ำ: {len(safe_to_delete)} รายการ (เก็บ ID {ids[0]})")
+                
+                if used_ids:
+                    _logger.info(f"⏭️ ข้าม {name} ที่ซ้ำ: {len(used_ids)} รายการ (มี booking อ้างอิง)")
         
-        if total_deleted > 0:
-            _logger.info(f"🗑️ ลบรายการซ้ำทั้งหมด: {total_deleted} รายการ")
+        if total_deleted > 0 or skipped_in_use > 0:
+            _logger.info(f"🗑️ ลบรายการซ้ำ: {total_deleted} รายการ, ข้ามเพราะถูกใช้งาน: {skipped_in_use} รายการ")
         
         return total_deleted
+
+    def _delete_tr_orders_safe(self):
+        """ลบข้อมูล TR- แบบปลอดภัย - ข้าม record ที่มี vehicle_booking อ้างอิง"""
+        tr_orders = self.search([('name', '=like', 'TR-%')])
+        
+        if not tr_orders:
+            return 0, 0
+        
+        tr_ids = tr_orders.ids
+        
+        # ✅ เช็คว่ามี vehicle_booking อ้างอิงอยู่หรือไม่
+        self.env.cr.execute("""
+            SELECT transport_order_id 
+            FROM vehicle_booking 
+            WHERE transport_order_id = ANY(%s)
+        """, (tr_ids,))
+        used_ids = [row[0] for row in self.env.cr.fetchall()]
+        
+        # ✅ กรองเอาเฉพาะ id ที่ไม่ถูกใช้งาน
+        safe_to_delete = [id for id in tr_ids if id not in used_ids]
+        
+        deleted_count = 0
+        skipped_count = len(used_ids)
+        
+        if safe_to_delete:
+            orders_to_delete = self.browse(safe_to_delete)
+            deleted_count = len(orders_to_delete)
+            orders_to_delete.unlink()
+            _logger.info(f"🗑️ ลบข้อมูล TR- แล้ว {deleted_count} รายการ")
+        
+        if skipped_count > 0:
+            _logger.info(f"⏭️ ข้าม TR- ที่มี booking อ้างอิง: {skipped_count} รายการ")
+        
+        return deleted_count, skipped_count
 
     def _sync_orders_from_odoo14(self):
         """ดึงข้อมูล Sale Orders จาก Odoo 14 (เฉพาะ SO- ทั้งหมด)"""
@@ -237,13 +291,8 @@ class TransportOrder(models.Model):
                     order.profit_per_trip_p = order.profit_per_trip_p / 100.0
                 _logger.info(f"🔧 แก้ไขค่า profit_per_trip_p แล้ว {len(wrong_profit_orders)} รายการ")
             
-            # 🗑️ ลบข้อมูล TR- ทั้งหมดก่อนซิงค์
-            tr_orders = self.search([('name', '=like', 'TR-%')])
-            tr_deleted_count = 0
-            if tr_orders:
-                tr_deleted_count = len(tr_orders)
-                tr_orders.unlink()
-                _logger.info(f"🗑️ ลบข้อมูล TR- แล้ว {tr_deleted_count} รายการ")
+            # 🗑️ ลบข้อมูล TR- แบบปลอดภัย (ข้าม record ที่มี booking อ้างอิง)
+            tr_deleted_count, tr_skipped_count = self._delete_tr_orders_safe()
             
             session = requests.Session()
 
@@ -401,6 +450,7 @@ class TransportOrder(models.Model):
                 f'✅ ซิงค์สำเร็จ!\n\n'
                 f'🗑️ ลบรายการซ้ำ: {duplicate_deleted_count} รายการ\n'
                 f'🗑️ ลบข้อมูล TR-: {tr_deleted_count} รายการ\n'
+                f'⏭️ ข้าม TR- (มี booking): {tr_skipped_count} รายการ\n'
                 f'🔍 พบทั้งหมด: {total_records} รายการใน Odoo 14\n'
                 f'📄 กรองเฉพาะ SO-: {len(so_orders)} รายการ\n'
                 f'✨ นำเข้าใหม่: {created_count} รายการ\n'
@@ -408,8 +458,8 @@ class TransportOrder(models.Model):
                 f'❌ ข้อผิดพลาด: {error_count} รายการ'
             )
             _logger.info(
-                f"✅ Sync completed: Duplicates={duplicate_deleted_count}, Deleted TR-={tr_deleted_count}, Total={total_records}, Filtered={len(so_orders)}, "
-                f"New={created_count}, Skipped={skipped_count}, Errors={error_count}"
+                f"✅ Sync completed: Duplicates={duplicate_deleted_count}, Deleted TR-={tr_deleted_count}, Skipped TR-={tr_skipped_count}, "
+                f"Total={total_records}, Filtered={len(so_orders)}, New={created_count}, Skipped={skipped_count}, Errors={error_count}"
             )
 
             return {

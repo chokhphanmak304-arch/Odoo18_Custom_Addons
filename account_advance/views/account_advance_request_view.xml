@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="account_advance_request_form_view" model="ir.ui.view">
+            <field name="name">account.advance.request.form</field>
+            <field name="model">account.advance.request</field>
+            <field name="arch" type="xml">
+                <form string="Advance Request">
+                    <header>
+                        <button name="submit" string="Submit" class="oe_highlight"
+                                invisible="state != 'draft'" type="object"/>
+                        <field name="advance_re_approve_show" invisible="1"/>
+                        <button name="approve" string="Approve" class="oe_highlight"
+                                type="object" groups="account.group_account_user"
+                                invisible="advance_re_approve_show == False or state != 'submit'"/>
+                        <button name="cancel" string="Cancel"
+                                invisible="state != 'submit'" type="object"
+                                groups="account.group_account_user"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submit,approve,receipt,cancel"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="employee_id"
+                                       readonly="state != 'draft'"
+                                       options="{'no_quick_create':True,'no_create_edit':True,'no_open': True}"/>
+                                <field name="department_id"
+                                       readonly="state != 'draft'"
+                                       options="{'no_quick_create':True,'no_create_edit':True,'no_open': True}"/>
+                                <field name="company_id"/>
+                            </group>
+                            <group>
+                                <field name="request_date" readonly="state != 'draft'"/>
+                                <field name="due_date" readonly="state != 'draft'"/>
+                                <field name="user_id" readonly="state != 'draft'"/>
+                                <field name="advance_id"/>
+                                <field name="analytic_account_id"
+                                       groups="analytic.group_analytic_accounting"/>
+                            </group>
+                        </group>
+                        <group string="Advance Information">
+                            <field name="advance_total" readonly="state != 'draft'"/>
+                            <field name="description" readonly="state != 'draft'"/>
+                        </group>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" widget="mail_followers"/>
+                        <field name="message_ids" widget="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <record id="account_advance_request_rule_branch" model="ir.rule">
+            <field name="name">Advance request: HQ sees all / Branch sees own</field>
+            <field name="model_id" ref="model_account_advance_request"/>
+            <field name="domain_force">
+                ['|', ('branch_id', '=', False), ('branch_id', 'in', user.branch_ids.ids)]
+            </field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <record id="account_advance_request_tree" model="ir.ui.view">
+            <field name="name">account.advance.request.tree</field>
+            <field name="model">account.advance.request</field>
+            <field name="arch" type="xml">
+                <tree string="Advance Request">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="request_date"/>
+                    <field name="user_id"/>
+                    <field name="advance_total"/>
+                    <field name="description"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="action_account_advance_request" model="ir.actions.act_window">
+            <field name="name">Advance Request</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.advance.request</field>
+            <field name="view_mode">tree,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create your first advance request
+                </p>
+            </field>
+        </record>
+
+        <menuitem id="account_advance_root" name="Advance System"
+                  parent="account.menu_finance" sequence="15"/>
+        <menuitem id="account_advance_request" name="Advance Request"
+                  parent="account_advance_root"
+                  action="action_account_advance_request" sequence="10"/>
+    </data>
+</odoo>

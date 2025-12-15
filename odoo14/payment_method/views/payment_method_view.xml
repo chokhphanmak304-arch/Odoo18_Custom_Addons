@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- List View for account.payment.method -->
+        <record id="account_payment_method_list" model="ir.ui.view">
+            <field name="name">account.payment.method.list</field>
+            <field name="model">account.payment.method</field>
+            <field name="arch" type="xml">
+                <list string="Payment Methods" editable="bottom">
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="payment_type"/>
+                    <field name="type"/>
+                    <field name="account_id"/>
+                    <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                    <field name="is_active"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form View for account.payment.method -->
+        <record id="account_payment_method_form" model="ir.ui.view">
+            <field name="name">account.payment.method.form</field>
+            <field name="model">account.payment.method</field>
+            <field name="arch" type="xml">
+                <form string="Payment Method">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="code"/>
+                                <field name="payment_type"/>
+                            </group>
+                            <group>
+                                <field name="type"/>
+                                <field name="account_id"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                                <field name="is_active"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action -->
+        <record id="action_account_payment_method" model="ir.actions.act_window">
+            <field name="name">Payment Methods</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.payment.method</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem action="action_account_payment_method" 
+                  id="menu_account_payment_method" 
+                  parent="account.account_account_menu" 
+                  sequence="6"/>
+    </data>
+</odoo>
